@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador de Plan de Cuentas (Final)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border-top-color: #3b82f6;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        @-webkit-keyframes spinner {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .config-section {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05);
+        }
+        /* INICIO: Añadidos estilos para modo oscuro en las secciones de configuración */
+        .dark .config-section {
+            background-color: #1e293b; /* gray-800 */
+            border-color: #334155;   /* gray-700 */
+        }
+        /* FIN: Añadidos estilos para modo oscuro */
+        .config-section-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-in-out, margin-top 0.4s ease-in-out, opacity 0.3s ease-in-out;
+            opacity: 0;
+        }
+        .config-section-content.is-open {
+            max-height: 200px;
+            margin-top: 1rem;
+            opacity: 1;
+        }
+        .icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            stroke-width: 2;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-7xl bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 md:p-10 space-y-6">
+        
+        <header class="flex justify-between items-center">
+            <div class="text-left">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">Prototipo: Transformador de Plan de Cuentas</h1>
+                <p class="mt-2 text-gray-600 dark:text-gray-400">Pega tu plan de cuentas, aplica reglas y obtén el CSV estructurado.</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-500 dark:text-gray-400">Modo Oscuro</span>
+                <button id="theme-toggle" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors bg-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <span class="sr-only">Toggle dark mode</span>
+                    <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform translate-x-1 dark:translate-x-6"></span>
+                </button>
+            </div>
+        </header>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="input-data" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">1. Pega tu Plan de Cuentas aquí:</label>
+                <textarea id="input-data" rows="15" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="Ej: 11 Disponible..."></textarea>
+            </div>
+            <div>
+                <label for="output-data" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">3. Resultado en formato CSV:</label>
+                <div class="relative">
+                    <textarea id="output-data" rows="15" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-shadow" readonly placeholder="El resultado aparecerá aquí..."></textarea>
+                    <div id="loader" class="absolute inset-0 bg-white bg-opacity-75 dark:bg-gray-800 dark:bg-opacity-75 flex items-center justify-center rounded-lg hidden">
+                        <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 dark:border-gray-600 h-24 w-24"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-4 pt-4">
+            <h3 class="text-xl font-semibold text-center text-gray-800 dark:text-gray-200 border-b dark:border-gray-700 pb-3 mb-6">Configuraciones Avanzadas (Opcional)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                <div class="config-section">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="customize-lock-manual" class="h-5 w-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <svg class="icon text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
+                        <span class="font-medium text-gray-700 dark:text-gray-300">Cuentas Asociadas</span>
+                    </label>
+                    <div id="lock-manual-content" class="config-section-content">
+                        <textarea id="lock-manual-list" rows="3" class="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg shadow-sm" placeholder="Ingrese cuentas separadas por coma o en nuevas líneas."></textarea>
+                    </div>
+                </div>
+                
+                <div class="config-section">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="customize-cash-account" class="h-5 w-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <svg class="icon text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        <span class="font-medium text-gray-700 dark:text-gray-300">Cuentas Monetarias</span>
+                    </label>
+                    <div id="cash-account-content" class="config-section-content">
+                        <textarea id="cash-account-list" rows="3" class="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg shadow-sm" placeholder="Ingrese cuentas separadas por coma o en nuevas líneas."></textarea>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="customize-block-manual" class="h-5 w-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <svg class="icon text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        <span class="font-medium text-gray-700 dark:text-gray-300">Bloqueo Manual</span>
+                    </label>
+                    <div id="block-manual-content" class="config-section-content">
+                        <textarea id="block-manual-list" rows="3" class="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg shadow-sm" placeholder="Ingrese cuentas separadas por coma o en nuevas líneas."></textarea>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="customize-protected" class="h-5 w-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <svg class="icon text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        <span class="font-medium text-gray-700 dark:text-gray-300">Cuentas Confidenciales</span>
+                    </label>
+                    <div id="protected-content" class="config-section-content">
+                        <textarea id="protected-list" rows="3" class="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg shadow-sm" placeholder="Ingrese cuentas separadas por coma o en nuevas líneas."></textarea>
+                    </div>
+                </div>
+
+                <div class="config-section col-span-1 md:col-span-2 lg:col-span-4">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="enable-cash-flow" class="h-5 w-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <svg class="icon text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M7 7l8 8M20 20v-5h-5M17 17l-8-8" /></svg>
+                        <span class="font-medium text-gray-700 dark:text-gray-300">Habilitar Flujo de Caja</span>
+                    </label>
+                    <div id="cash-flow-options" class="config-section-content pl-8 space-y-2">
+                        <div>
+                            <label class="flex items-center space-x-2">
+                                <input type="radio" name="cashflow-option" value="default" class="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 focus:ring-blue-500" checked>
+                                <span>Usar cuentas por defecto (1105, 1110, 1120)</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="flex items-center space-x-2">
+                                <input type="radio" name="cashflow-option" value="custom" class="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 focus:ring-blue-500">
+                                <span>Personalizar lista</span>
+                            </label>
+                        </div>
+                        <div id="cash-flow-custom-area" class="config-section-content">
+                            <textarea id="cash-flow-list" rows="3" class="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-lg shadow-sm" placeholder="Ingrese cuentas separadas por coma o en nuevas líneas."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 pt-6 border-t dark:border-gray-700">
+            <button id="process-btn" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:-translate-y-1">
+                2. Procesar Datos
+            </button>
+            <div class="flex gap-4">
+                <button id="copy-btn" class="bg-gray-600 hover:bg-gray-700 dark:bg-gray-500 dark:hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Copiar Resultado
+                </button>
+                <button id="download-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Descargar CSV
+                </button>
+            </div>
+        </div>
+
+        <div id="feedback-message" class="text-center text-green-600 font-medium h-5"></div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- INICIO: LÓGICA DE MODO OSCURO ---
+            const themeToggle = document.getElementById('theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', () => {
+                    document.documentElement.classList.toggle('dark');
+                    // Mueve el círculo del interruptor
+                    const toggleCircle = themeToggle.querySelector('span:last-child');
+                    toggleCircle.classList.toggle('translate-x-1');
+                    toggleCircle.classList.toggle('translate-x-6');
+                });
+            }
+            // --- FIN: LÓGICA DE MODO OSCURO ---
+            
+            // --- LÓGICA DE UI ---
+            const setupCheckboxToggle = (checkboxId, contentId) => {
+                const checkboxElement = document.getElementById(checkboxId);
+                const contentDiv = document.getElementById(contentId);
+                checkboxElement.addEventListener('change', () => {
+                    contentDiv.classList.toggle('is-open', checkboxElement.checked);
+                });
+            };
+            
+            setupCheckboxToggle('customize-lock-manual', 'lock-manual-content');
+            setupCheckboxToggle('customize-cash-account', 'cash-account-content');
+            setupCheckboxToggle('customize-block-manual', 'block-manual-content');
+            setupCheckboxToggle('customize-protected', 'protected-content');
+            
+            const enableCashFlowCheck = document.getElementById('enable-cash-flow');
+            const cashFlowOptionsDiv = document.getElementById('cash-flow-options');
+            const cashFlowCustomRadio = document.querySelector('input[name="cashflow-option"][value="custom"]');
+            const cashFlowCustomArea = document.getElementById('cash-flow-custom-area');
+
+            enableCashFlowCheck.addEventListener('change', () => {
+                cashFlowOptionsDiv.classList.toggle('is-open', enableCashFlowCheck.checked);
+            });
+            
+            document.querySelectorAll('input[name="cashflow-option"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    cashFlowCustomArea.classList.toggle('is-open', cashFlowCustomRadio.checked);
+                });
+            });
+
+            // --- LÓGICA PRINCIPAL ---
+            const processBtn = document.getElementById('process-btn');
+            processBtn.addEventListener('click', () => {
+                const rawData = document.getElementById('input-data').value;
+                if (!rawData.trim()) {
+                    showFeedback('Por favor, pega los datos del plan de cuentas.', 'error');
+                    return;
+                }
+                document.getElementById('loader').classList.remove('hidden');
+                document.getElementById('output-data').value = '';
+                disableButtons();
+                showFeedback('Procesando, por favor espera...', 'info');
+                setTimeout(() => {
+                    try {
+                        const processedCsv = processChartOfAccounts(rawData);
+                        document.getElementById('output-data').value = processedCsv;
+                        enableButtons();
+                        showFeedback('¡Proceso completado exitosamente!', 'success');
+                    } catch (error) {
+                        console.error("Error durante el procesamiento:", error);
+                        showFeedback(error.message, 'error');
+                    } finally {
+                        document.getElementById('loader').classList.add('hidden');
+                    }
+                }, 50);
+            });
+            
+            const copyBtn = document.getElementById('copy-btn');
+            copyBtn.addEventListener('click', () => {
+                const outputDataEl = document.getElementById('output-data');
+                if (!outputDataEl.value) return;
+                outputDataEl.select();
+                document.execCommand('copy');
+                showFeedback('¡Resultado copiado al portapapeles!', 'success');
+            });
+
+            const downloadBtn = document.getElementById('download-btn');
+            downloadBtn.addEventListener('click', () => {
+                const outputDataEl = document.getElementById('output-data');
+                if (!outputDataEl.value) return;
+                const blob = new Blob([outputDataEl.value], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'PlanDeCuentas_Procesado.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showFeedback('Descarga iniciada.', 'success');
+            });
+
+            function showFeedback(message, type = 'success') {
+                const feedbackMessageEl = document.getElementById('feedback-message');
+                feedbackMessageEl.textContent = message;
+                feedbackMessageEl.className = 'text-center font-medium h-5 transition-colors'; // Añadida transición
+                if (type === 'error') feedbackMessageEl.classList.add('text-red-600');
+                else if (type === 'info') feedbackMessageEl.classList.add('text-blue-600');
+                else feedbackMessageEl.classList.add('text-green-600');
+                setTimeout(() => {
+                    if(feedbackMessageEl.textContent === message) feedbackMessageEl.textContent = '';
+                }, 5000);
+            }
+
+            function disableButtons() {
+                copyBtn.disabled = true;
+                downloadBtn.disabled = true;
+                processBtn.disabled = true;
+                processBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+
+            function enableButtons() {
+                copyBtn.disabled = false;
+                downloadBtn.disabled = false;
+                processBtn.disabled = false;
+                processBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+
+            // --- MOTOR DE PROCESAMIENTO ---
+            function processChartOfAccounts(rawData) {
+                const getCustomList = (textarea) => textarea.value.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+                
+                const config = {
+                    useCustomLockManual: document.getElementById('customize-lock-manual').checked,
+                    lockManualPrefixes: getCustomList(document.getElementById('lock-manual-list')),
+                    useCustomCashAccount: document.getElementById('customize-cash-account').checked,
+                    cashAccountPrefixes: getCustomList(document.getElementById('cash-account-list')),
+                    useCustomBlockManual: document.getElementById('customize-block-manual').checked,
+                    blockManualPrefixes: getCustomList(document.getElementById('block-manual-list')),
+                    useCustomProtected: document.getElementById('customize-protected').checked,
+                    protectedPrefixes: getCustomList(document.getElementById('protected-list')),
+                    cashFlowEnabled: document.getElementById('enable-cash-flow').checked,
+                    cashFlowOption: document.querySelector('input[name="cashflow-option"]:checked').value,
+                    cashFlowCustomPrefixes: getCustomList(document.getElementById('cash-flow-list'))
+                };
+
+                const accountsMap = new Map();
+                const lines = rawData.split('\n').filter(line => line.trim() !== '');
+                const processedCodes = new Set();
+
+                lines.forEach(line => {
+                    const trimmedLine = line.trim();
+                    const match = trimmedLine.match(/^(\d[\d\s.a-zA-Z-]*?)\s+(.*)/);
+                    if (match) {
+                        let code = match[1].trim().replace(/\D/g, '');
+                        let name = match[2].trim();
+                        if (code.length === 1) return;
+                        if (code.length === 3) code += '0';
+                        if (code.length === 5) code += '0';
+                        if (code.length === 7) code += '0';
+                        if (processedCodes.has(code)) {
+                            console.warn(`Advertencia: Código duplicado omitido: ${code}`);
+                            return;
+                        }
+                        processedCodes.add(code);
+                        accountsMap.set(code, { code, name: name.toUpperCase() });
+                    }
+                });
+
+                const missingParents = new Map();
+                for (const code of accountsMap.keys()) {
+                    let currentCode = code;
+                    while (currentCode.length > 2) {
+                        const parentCode = currentCode.substring(0, currentCode.length - 2);
+                        if (!accountsMap.has(parentCode) && !missingParents.has(parentCode)) {
+                            const childName = (accountsMap.get(currentCode) || missingParents.get(currentCode)).name;
+                            missingParents.set(parentCode, { code: parentCode, name: childName });
+                        }
+                        currentCode = parentCode;
+                    }
+                }
+                missingParents.forEach((value, key) => accountsMap.set(key, value));
+
+                const originalCodes = Array.from(accountsMap.keys());
+                originalCodes.forEach(code => {
+                    const isLeaf = !originalCodes.some(otherCode => otherCode.startsWith(code) && otherCode.length > code.length);
+                    if (isLeaf && code.length < 8) {
+                        let currentCode = code;
+                        let currentName = accountsMap.get(code).name;
+                        while(currentCode.length < 8) {
+                            const newChildCode = currentCode + '01';
+                            if (!accountsMap.has(newChildCode)) {
+                                accountsMap.set(newChildCode, { code: newChildCode, name: currentName });
+                            }
+                            currentCode = newChildCode;
+                        }
+                    }
+                });
+
+                const headers = ["FormatCode", "Name", "FatherAccountKey", "Code", "AccountType", "AcctCurrency", "ActiveAccount", "LockManualTransaction", "CashAccount", "ExternalCode", "ForeignName", "U_InfoCo02", "CashFlowRelevant", "ProjectRelevant", "DistributionRuleRelevant", "DistributionRule2Relevant", "DistributionRule3Relevant", "DistributionRule4Relevant", "DistributionRule5Relevant", "BlockManualPosting", "Protected"];
+                const spanishHeaders = ["Codigo Cuenta", "Nombre (Máximo 100 Caracteres)", "Cuenta Padre", "Codigo Cuenta", "Tipo de Cuenta (Activo, Pasivo y Patrimonio deben marcarse como at_Other, ingresos como at_Expenses, gastos y costos cómo at_Revenues", "Moneda Cuenta", "Genera Movimiento", "Cuenta asociada", "Cuentas monetarias", "Código Adicional", "Descripción adicional", "Requiere tercero", "Flujo de caja", "Obliga Proyecto", "Obliga centro de costo dim1", "Obliga centro de costo dim2", "Obliga centro de costo dim3", "Obliga centro de costo dim4", "Obliga centro de costo dim5", "Bloquear contabilización manual", "Cuenta Confidencial"];
+                const csvRows = [headers.map(h => `"${h}"`).join(','), spanishHeaders.map(h => `"${h}"`).join(',')];
+                
+                const finalSortedCodes = Array.from(accountsMap.keys()).sort();
+                finalSortedCodes.forEach(code => {
+                    const acc = accountsMap.get(code);
+                    const isTitle = code.length < 8;
+                    const row = {
+                        FormatCode: acc.code, Name: acc.name, FatherAccountKey: getFatherAccountKey(acc.code), Code: acc.code,
+                        AccountType: isTitle ? '' : getAccountType(acc.code),
+                        AcctCurrency: isTitle ? '' : '##',
+                        ActiveAccount: isTitle ? 'tNO' : 'tYES',
+                        LockManualTransaction: isTitle ? 'tNO' : getLockManualTransaction(code, config),
+                        CashAccount: isTitle ? 'tNO' : getCashAccount(code, config),
+                        ExternalCode: '', ForeignName: '', U_InfoCo02: isTitle ? '' : '1',
+                        CashFlowRelevant: isTitle ? 'tNO' : getCashFlowRelevant(code, config),
+                        ProjectRelevant: 'tNO', DistributionRuleRelevant: 'tNO', DistributionRule2Relevant: 'tNO',
+                        DistributionRule3Relevant: 'tNO', DistributionRule4Relevant: 'tNO', DistributionRule5Relevant: 'tNO',
+                        BlockManualPosting: isTitle ? '' : (config.useCustomBlockManual && isPrefixInList(code, config.blockManualPrefixes) ? 'tYES' : ''),
+                        Protected: isTitle ? 'tNO' : (config.useCustomProtected && isPrefixInList(code, config.protectedPrefixes) ? 'tYES' : 'tNO')
+                    };
+                    csvRows.push(headers.map(header => `"${row[header] || ''}"`).join(','));
+                });
+
+                return csvRows.join('\n');
+            }
+
+            // --- FUNCIONES DE REGLAS ESPECÍFICAS ---
+            const isPrefixInList = (code, prefixList) => {
+                if (!prefixList || prefixList.length === 0) return false;
+                return prefixList.some(p => code.startsWith(p));
+            };
+
+            function getFatherAccountKey(code) {
+                const len = code.length;
+                if (len === 2) {
+                    if (['42', '43', '47'].includes(code)) return '700000000000000';
+                    if (['53', '54', '55', '56', '57', '58', '59'].includes(code)) return '800000000000000';
+                    const firstDigit = code.charAt(0);
+                    if (firstDigit === '1') return '100000000000000';
+                    if (firstDigit === '2') return '200000000000000';
+                    if (firstDigit === '3') return '300000000000000';
+                    if (firstDigit === '4') return '400000000000000';
+                    if (firstDigit === '5') return '600000000000000';
+                    if (['6', '7'].includes(firstDigit)) return '500000000000000';
+                    if (firstDigit === '8') return 'A00000000000000';
+                    if (firstDigit === '9') return '900000000000000';
+                }
+                return len > 2 ? code.substring(0, len - 2) : '';
+            }
+
+            function getAccountType(code) {
+                const firstDigit = code.charAt(0);
+                if (['1','2','3','8','9'].includes(firstDigit)) return 'at_Other';
+                if (firstDigit === '4') return 'at_Revenues';
+                if (['5', '6', '7'].includes(firstDigit)) return 'at_Expenses';
+                return 'at_Other';
+            }
+
+            function getLockManualTransaction(code, config) {
+                const defaultPrefixes = ['1305', '1310', '2235', '2335', '25050501'];
+                const prefixesToUse = config.useCustomLockManual ? config.lockManualPrefixes : defaultPrefixes;
+                return isPrefixInList(code, prefixesToUse) ? 'tYES' : 'tNO';
+            }
+
+            function getCashAccount(code, config) {
+                const defaultPrefixes = ['1105', '1110', '1120'];
+                const prefixesToUse = config.useCustomCashAccount ? config.cashAccountPrefixes : defaultPrefixes;
+                return isPrefixInList(code, prefixesToUse) ? 'tYES' : 'tNO';
+            }
+            
+            function getCashFlowRelevant(code, config) {
+                if (!config.cashFlowEnabled) return 'tNO';
+                const defaultPrefixes = ['1105', '1110', '1120'];
+                const prefixesToUse = config.cashFlowOption === 'custom' ? config.cashFlowCustomPrefixes : defaultPrefixes;
+                return isPrefixInList(code, prefixesToUse) ? 'tYES' : 'tNO';
+            }
+        });
+    </script>
+</body>
+</html>
