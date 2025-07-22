@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="es" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Constructor y Auditor de Plantillas de Terceros para SAP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            // Habilita el modo oscuro basado en la clase 'dark' en el elemento <html>.
+            darkMode: 'class',
+            theme: {
+                // 'extend' permite añadir nuevas utilidades sin sobreescribir las existentes.
+                extend: {
+                    // Se define una paleta de colores personalizada para mantener la consistencia visual.
+                    colors: {
+                        primary: {
+                            '50': '#eff6ff', '100': '#dbeafe', '200': '#bfdbfe', '300': '#93c5fd', '400': '#60a5fa', '500': '#3b82f6', '600': '#2563eb', '700': '#1d4ed8', '800': '#1e40af', '900': '#1e3a8a'
+                        },
+                        gray: {
+                            '50': '#f8fafc', '100': '#f1f5f9', '200': '#e2e8f0', '300': '#cbd5e1', '400': '#94a3b8', '500': '#64748b', '600': '#475569', '700': '#334155', '800': '#1e293b', '900': '#0f172a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Define la tipografía base para toda la página. */
+        body { font-family: 'Inter', sans-serif; }
+        /* Estilos para el indicador de carga (spinner). */
+        .loader {
+            border-top-color: #3b82f6; /* Color del borde superior que gira. */
+            animation: spinner 1.5s linear infinite; /* Asigna la animación. */
+        }
+        /* Define la animación de rotación para el spinner. */
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+    <div class="w-full max-w-screen-2xl mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 md:p-10 my-8 space-y-8">
+        
+        <header class="flex justify-between items-center">
+            <div class="text-left">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">Constructor de Terceros</h1>
+                <p class="mt-2 text-gray-500 dark:text-gray-400">Genera y audita plantillas de Socios de Negocio para SAP B1.</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-500 dark:text-gray-400">Modo Oscuro</span>
+                <button id="theme-toggle" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors bg-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                    <span class="sr-only">Toggle dark mode</span>
+                    <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform translate-x-1 dark:translate-x-6"></span>
+                </button>
+            </div>
+        </header>
+
+        <div class="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg flex flex-col sm:flex-row justify-center items-center gap-4 border border-gray-200 dark:border-gray-700">
+            <label class="font-medium text-gray-700 dark:text-gray-300">Modo de Operación:</label>
+            <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="operation-mode" value="build" class="h-4 w-4 text-primary-600 bg-gray-100 border-gray-300 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" checked>
+                    <span>Generar Plantilla</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="operation-mode" value="audit" class="h-4 w-4 text-primary-600 bg-gray-100 border-gray-300 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                    <span>Generar Reporte de Errores</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div>
+                <label for="input-data" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">1. Pega tus datos aquí:</label>
+                <textarea id="input-data" rows="18" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm bg-white dark:bg-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-shadow" placeholder="La primera línea debe ser el encabezado (ej: Identificación, Nombre...). Los datos deben estar separados por tabulaciones."></textarea>
+            </div>
+            <div>
+                <label for="output-data" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">3. Resultado:</label>
+                <div class="relative">
+                    <textarea id="output-data" rows="18" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-shadow" readonly placeholder="La plantilla para SAP o el reporte de errores aparecerá aquí..."></textarea>
+                    <div id="loader" class="absolute inset-0 bg-white/70 dark:bg-gray-800/70 flex items-center justify-center rounded-lg hidden">
+                        <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 dark:border-gray-600 h-24 w-24"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-4 pt-4">
+            <h3 class="text-xl font-semibold text-center text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-3 mb-6">2. Configuraciones y Mapeo de Datos</h3>
+            <div id="config-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div id="payment-terms-mapper-section" class="config-section hidden">
+                    <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-3">Mapeo: Condiciones de Pago</h4>
+                    <div id="payment-terms-mapper-content" class="space-y-2 max-h-48 overflow-y-auto pr-2"></div>
+                    <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <label for="default-payment-term" class="text-sm font-medium">Código por defecto:</label>
+                        <input type="text" id="default-payment-term" value="-1" class="mt-1 w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-900">
+                    </div>
+                </div>
+                <div id="doc-types-mapper-section" class="config-section hidden">
+                    <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-3">Mapeo: Tipos de Documento</h4>
+                    <div id="doc-types-mapper-content" class="space-y-2 max-h-48 overflow-y-auto pr-2"></div>
+                </div>
+                <div class="config-section">
+                    <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-3">Validación de Cuentas</h4>
+                    <div class="space-y-2">
+                        <div>
+                            <label for="valid-accounts" class="text-sm font-medium">Cuentas Válidas (una por línea):</label>
+                            <textarea id="valid-accounts" rows="4" class="mt-1 w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-900" placeholder="13050505&#10;22050101"></textarea>
+                        </div>
+                        <div class="space-y-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <label class="text-sm font-medium">Cuentas por defecto:</label>
+                            <div>
+                                <label for="default-account-customer" class="text-xs text-gray-500 dark:text-gray-400">Para Clientes:</label>
+                                <input type="text" id="default-account-customer" value="13050505" class="mt-1 w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-900">
+                            </div>
+                            <div>
+                                <label for="default-account-supplier" class="text-xs text-gray-500 dark:text-gray-400">Para Proveedores:</label>
+                                <input type="text" id="default-account-supplier" value="22050101" class="mt-1 w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-900">
+                            </div>
+                            <div>
+                                <label for="default-account-employee" class="text-xs text-gray-500 dark:text-gray-400">Para Empleados:</label>
+                                <input type="text" id="default-account-employee" value="25050101" class="mt-1 w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-900">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="config-section">
+                    <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-3">Normalización de Texto</h4>
+                    <div class="space-y-2">
+                        <label for="text-normalization" class="text-sm font-medium">Formato de texto:</label>
+                        <select id="text-normalization" class="mt-1 w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-900">
+                            <option value="proper">Nombres Propios</option>
+                            <option value="upper">MAYÚSCULAS</option>
+                            <option value="lower">minúsculas</option>
+                        </select>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Aplica a: Nombre, Dirección, Ciudad, Apellidos y Nombres</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <button id="process-btn" class="w-full md:w-auto bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                Procesar Datos
+            </button>
+            <div class="flex gap-4">
+                <button id="copy-btn" class="bg-gray-600 hover:bg-gray-700 dark:bg-gray-500 dark:hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    Copiar
+                </button>
+                <button id="download-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    Descargar
+                </button>
+            </div>
+        </div>
+
+        <div id="feedback-message" class="text-center font-medium h-5"></div>
+    </div>
+
+    <script>
+        // Se ejecuta cuando el contenido HTML de la página ha sido completamente cargado y parseado.
+        document.addEventListener('DOMContentLoaded', () => {
+            // Lógica para el interruptor de modo oscuro.
+            const themeToggle = document.getElementById('theme-toggle');
+            themeToggle.addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+            });
+            
+            // --- Referencias a los elementos del DOM para fácil acceso ---
+            const processBtn = document.getElementById('process-btn');
+            const copyBtn = document.getElementById('copy-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const inputEl = document.getElementById('input-data');
+            const outputEl = document.getElementById('output-data');
+            const loaderEl = document.getElementById('loader');
+            const feedbackEl = document.getElementById('feedback-message');
+
+            // --- Datos Maestros y Catálogos ---
+            // Mapeo de códigos de tipo de documento a sus descripciones.
+            const docTypes = {'11': 'Registro civil de nacimiento', '12': 'Tarjeta de identidad', '13': 'Cédula de ciudadanía', '14': 'PEP', '21': 'Tarjeta de extranjería', '22': 'Cédula de extranjería', '31': 'NIT', '33': 'Identificación de extranjeros', '41': 'Pasaporte', '42': 'Tipo de documento extranjero', '43': 'Doc. para información exógena', '50': 'NIT de otro país', '91': 'NUIP *'};
+            // Conjunto (Set) de códigos de país válidos (ISO 3166-1 alfa-2) para una validación rápida.
+            const countryCodes = new Set(['AF', 'AL', 'DZ', 'AD', 'AO', 'AG', 'AR', 'AM', 'AW', 'AU', 'AT', 'AZ', 'BS', 'BH', 'BD', 'BB', 'BY', 'BE', 'BZ', 'BJ', 'BM', 'BT', 'BO', 'BA', 'BW', 'BR', 'BG', 'BF', 'BI', 'KH', 'CM', 'CA', 'CV', 'KY', 'CF', 'TD', 'CL', 'CN', 'CO', 'KM', 'CG', 'CD', 'CK', 'CR', 'HR', 'CU', 'CY', 'CZ', 'DK', 'DJ', 'DM', 'DO', 'EC', 'EG', 'SV', 'GQ', 'ER', 'EE', 'ET', 'FK', 'FO', 'FJ', 'FI', 'FR', 'GA', 'GM', 'GE', 'DE', 'GH', 'GI', 'EL', 'GL', 'GD', 'GT', 'GN', 'GW', 'GY', 'HT', 'HN', 'HK', 'HU', 'IS', 'IN', 'ID', 'IR', 'IQ', 'IE', 'IL', 'IT', 'CI', 'JM', 'JP', 'JO', 'KZ', 'KE', 'KI', 'KW', 'KG', 'LA', 'LV', 'LB', 'LS', 'LR', 'LY', 'LI', 'LT', 'LU', 'MO', 'MG', 'MW', 'MY', 'MV', 'ML', 'MT', 'MH', 'MR', 'MU', 'MX', 'FM', 'MD', 'MC', 'MN', 'ME', 'MS', 'MA', 'MZ', 'MM', 'NA', 'NR', 'NP', 'NL', 'NZ', 'NI', 'NE', 'NG', 'NU', 'KP', 'NO', 'OM', 'PK', 'PW', 'PA', 'PG', 'PY', 'PE', 'PH', 'PL', 'PT', 'PR', 'QA', 'MK', 'RO', 'RU', 'RW', 'SA', 'CH', 'SN', 'RS', 'SC', 'SL', 'SG', 'SK', 'SI', 'SB', 'SO', 'ZA', 'KR', 'ES', 'LK', 'SD', 'SR', 'SZ', 'SE', 'SY', 'TW', 'TJ', 'TZ', 'TH', 'TL', 'TG', 'TO', 'TT', 'TN', 'TR', 'TM', 'TV', 'US', 'UG', 'UA', 'AE', 'GB', 'UY', 'UZ', 'VU', 'VE', 'VN', 'YE', 'ZM', 'ZW']);
+            // Mapeo de nombres de municipios a sus códigos DANE para Colombia.
+            const municipalityMap = new Map([['MEDELLIN', '05001'], ['BARRANQUILLA', '08001'], ['BOGOTA', '11001'], ['CARTAGENA', '13001'], ['TUNJA', '15001'], ['MANIZALES', '17001'], ['FLORENCIA', '18001'], ['POPAYAN', '19001'], ['VALLEDUPAR', '20001'], ['MONTERIA', '23001'], ['QUIBDO', '27001'], ['NEIVA', '41001'], ['RIOHACHA', '44001'], ['SANTA MARTA', '47001'], ['VILLAVICENCIO', '50001'], ['PASTO', '52001'], ['CUCUTA', '54001'], ['ARMENIA', '63001'], ['PEREIRA', '66001'], ['BUCARAMANGA', '68001'], ['SINCELEJO', '70001'], ['IBAGUE', '73001'], ['CALI', '76001'], ['ARAUCA', '81001'], ['YOPAL', '85001'], ['MOCOA', '86001'], ['SAN ANDRES', '88001'], ['LETICIA', '91001'], ['INIRIDA', '94001'], ['SAN JOSE DEL GUAVIARE', '95001'], ['MITU', '97001'], ['PUERTO CARREÑO', '99001']]);
+
+            // --- Asignación de Eventos (Event Listeners) ---
+            processBtn.addEventListener('click', runProcessor);
+            copyBtn.addEventListener('click', copyOutput);
+            downloadBtn.addEventListener('click', downloadOutput);
+            // Genera los mapeadores dinámicos cuando el usuario escribe en el área de entrada.
+            inputEl.addEventListener('input', () => setTimeout(generateMappers, 50));
+
+            /**
+             * Función principal que se ejecuta al presionar el botón "Procesar Datos".
+             * Orquesta la lectura, validación y transformación de los datos.
+             */
+            function runProcessor() {
+                const rawData = inputEl.value;
+                if (!rawData.trim()) {
+                    showFeedback('Por favor, pega los datos de los terceros.', 'error');
+                    return;
+                }
+                // Muestra el spinner y gestiona el estado de los botones.
+                loaderEl.classList.remove('hidden');
+                outputEl.value = '';
+                disableButtons();
+                showFeedback('Procesando, por favor espera...', 'info');
+                // Usa setTimeout para permitir que el navegador actualice la UI antes de iniciar el procesamiento pesado.
+                setTimeout(() => {
+                    try {
+                        const mode = document.querySelector('input[name="operation-mode"]:checked').value;
+                        const processor = new BusinessPartnerProcessor(rawData, getConfig());
+                        const result = processor.process(mode);
+                        // Muestra el resultado dependiendo del modo de operación.
+                        if (mode === 'audit') {
+                            outputEl.value = result.length > 0 ? result.join('\n') : "¡Felicidades! No se encontraron errores en la auditoría.";
+                        } else {
+                            outputEl.value = result;
+                        }
+                        enableButtons();
+                        showFeedback('¡Proceso completado!', 'success');
+                    } catch (error) {
+                        // Captura y muestra cualquier error que ocurra durante el proceso.
+                        console.error("Error:", error);
+                        showFeedback(error.message, 'error');
+                    } finally {
+                        // Asegura que el spinner se oculte y los botones se reactiven, incluso si hay un error.
+                        loaderEl.classList.add('hidden');
+                        processBtn.disabled = false;
+                        processBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    }
+                }, 100);
+            }
+            
+            /**
+             * Muestra un mensaje de retroalimentación al usuario y lo oculta después de 5 segundos.
+             * @param {string} message - El mensaje a mostrar.
+             * @param {string} type - El tipo de mensaje ('success', 'error', 'info').
+             */
+            function showFeedback(message, type = 'success') {
+                feedbackEl.textContent = message;
+                feedbackEl.className = 'text-center font-medium h-5 transition-colors';
+                if (type === 'error') feedbackEl.classList.add('text-red-500');
+                else if (type === 'info') feedbackEl.classList.add('text-blue-500');
+                else feedbackEl.classList.add('text-green-500');
+                setTimeout(() => { if(feedbackEl.textContent === message) feedbackEl.textContent = ''; }, 5000);
+            }
+
+            // --- Funciones de Utilidad para la UI ---
+            function disableButtons() {
+                copyBtn.disabled = true;
+                downloadBtn.disabled = true;
+                processBtn.disabled = true;
+                processBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+
+            function enableButtons() {
+                copyBtn.disabled = false;
+                downloadBtn.disabled = false;
+            }
+
+            /**
+             * Copia el contenido del área de texto de salida al portapapeles.
+             */
+            function copyOutput() {
+                if (!outputEl.value) return;
+                outputEl.select();
+                document.execCommand('copy'); // Nota: execCommand es un método antiguo pero funcional para este caso.
+                showFeedback('¡Resultado copiado!', 'success');
+            }
+
+            /**
+             * Genera y descarga un archivo .txt con el contenido del área de salida.
+             */
+            function downloadOutput() {
+                if (!outputEl.value) return;
+                const mode = document.querySelector('input[name="operation-mode"]:checked').value;
+                const filename = mode === 'audit' ? 'Reporte_Errores_Terceros.txt' : 'Plantilla_Terceros_SAP.txt';
+                const blob = new Blob([outputEl.value], { type: 'text/plain;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                link.click();
+                URL.revokeObjectURL(link.href); // Libera la memoria del objeto URL.
+                showFeedback('Descarga iniciada.', 'success');
+            }
+
+            /**
+             * Recopila todas las configuraciones seleccionadas por el usuario en la UI
+             * y las devuelve en un único objeto de configuración.
+             * @returns {object} - El objeto con toda la configuración.
+             */
+            function getConfig() {
+                const paymentTermsMap = new Map();
+                document.querySelectorAll('.payment-term-map').forEach(row => {
+                    const original = row.dataset.original;
+                    const sapCode = row.querySelector('input').value;
+                    if (original && sapCode) paymentTermsMap.set(original.toLowerCase(), sapCode);
+                });
+                const docTypesMap = new Map();
+                document.querySelectorAll('.doc-type-map').forEach(row => {
+                    const original = row.dataset.original;
+                    const sapCode = row.querySelector('select').value;
+                    if (original && sapCode) docTypesMap.set(original.toLowerCase(), sapCode);
+                });
+                return {
+                    paymentTermsMap,
+                    docTypesMap,
+                    defaultPaymentTerm: document.getElementById('default-payment-term').value,
+                    validAccounts: new Set(document.getElementById('valid-accounts').value.split('\n').map(l => l.trim()).filter(Boolean)),
+                    defaultAccountCustomer: document.getElementById('default-account-customer').value,
+                    defaultAccountSupplier: document.getElementById('default-account-supplier').value,
+                    defaultAccountEmployee: document.getElementById('default-account-employee').value,
+                    textNormalization: document.getElementById('text-normalization').value
+                };
+            }
+
+            /**
+             * Analiza los datos de entrada para encontrar columnas que requieren mapeo
+             * y genera dinámicamente los controles de UI correspondientes.
+             */
+            function generateMappers() {
+                const rawData = inputEl.value;
+                const lines = rawData.trim().split('\n');
+                if (lines.length < 2) return; // Se necesita al menos una línea de encabezado y una de datos.
+                const headers = lines[0].trim().toLowerCase().split('\t');
+                const paymentTermIndex = headers.findIndex(h => ['condición de pago', 'paytermsgrpcode'].includes(h));
+                const docTypeIndex = headers.findIndex(h => ['tipo documento', 'tipo docuemnto', 'u_bpco_tdc'].includes(h));
+                // Lógica para el mapeador de condiciones de pago.
+                if (paymentTermIndex !== -1) {
+                    const uniqueTerms = new Set(lines.slice(1).map(line => line.split('\t')[paymentTermIndex]?.trim()).filter(Boolean));
+                    const paymentSection = document.getElementById('payment-terms-mapper-section');
+                    const paymentContent = document.getElementById('payment-terms-mapper-content');
+                    paymentContent.innerHTML = '';
+                    uniqueTerms.forEach(term => {
+                        paymentContent.innerHTML += `<div class="flex items-center gap-2 payment-term-map" data-original="${term}"><span class="text-sm text-gray-600 dark:text-gray-400 flex-1">${term}:</span><input type="text" class="w-1/2 p-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-900" placeholder="Código SAP"></div>`;
+                    });
+                    paymentSection.classList.remove('hidden');
+                }
+                // Lógica para el mapeador de tipos de documento.
+                if (docTypeIndex !== -1) {
+                    const uniqueDocs = new Set(lines.slice(1).map(line => line.split('\t')[docTypeIndex]?.trim()).filter(Boolean));
+                    const docSection = document.getElementById('doc-types-mapper-section');
+                    const docContent = document.getElementById('doc-types-mapper-content');
+                    let optionsHtml = '<option value="">Seleccionar...</option>';
+                    for(const code in docTypes) { optionsHtml += `<option value="${code}">${code} - ${docTypes[code]}</option>`; }
+                    docContent.innerHTML = '';
+                    uniqueDocs.forEach(doc => {
+                        docContent.innerHTML += `<div class="flex items-center gap-2 doc-type-map" data-original="${doc}"><span class="text-sm text-gray-600 dark:text-gray-400 flex-1">${doc}:</span><select class="w-1/2 p-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-900">${optionsHtml}</select></div>`;
+                    });
+                    docSection.classList.remove('hidden');
+                }
+            }
+
+            /**
+             * Clase que encapsula toda la lógica de procesamiento de socios de negocio.
+             */
+            class BusinessPartnerProcessor {
+                constructor(rawData, config) {
+                    this.lines = rawData.trim().split('\n');
+                    this.config = config;
+                    // Define las cabeceras y descripciones estándar de la plantilla de SAP B1.
+                    this.sapHeaders = ["CardCode", "CardName", "CardType", "GroupCode", "Address", "U_BPCO_CS", "City", "Country", "Currency", "DebitorAccount", "EmailAddress", "FederalTaxID", "PayTermsGrpCode", "Phone1", "Cellular", "VatLiable", "SubjectToWithholdingTax", "U_BPCO_1Apellido", "U_BPCO_2Apellido", "U_BPCO_Nombre", "U_BPCO_TDC", "U_BPCO_TP", "U_EsAutorret", "U_BPCO_RTC", "U_BPCO_Address"];
+                    this.sapDescriptions = ["Código del tercero", "Nombre del tercero", "Tipo de tercero", "Grupo del tercero", "Dirección", "Código Ciudad (MM)", "Ciudad", "País", "Moneda", "Cuenta asociada", "Correo electrónico", "Identificación fiscal", "Condiciones de pago", "Teléfono 1", "Celular", "Sujeto a impuesto", "Sujeto a retención", "Primer Apellido", "Segundo Apellido", "Nombres", "Tipo de Documento", "Tipo de Persona", "Es Autorretenedor", "Régimen", "Dirección (MM)"];
+                    if (this.lines.length > 0) {
+                        // Extrae la línea de encabezado del usuario y la procesa.
+                        const headerLine = this.lines.shift();
+                        this.userHeaders = headerLine.trim().toLowerCase().split('\t');
+                        this.headerMap = this.mapHeaders(this.userHeaders);
+                    } else {
+                        throw new Error("No se encontraron datos para procesar.");
+                    }
+                }
+
+                /**
+                 * Mapea de forma flexible las cabeceras proporcionadas por el usuario a un conjunto estándar de claves.
+                 * Utiliza alias para reconocer diferentes nombres de columna (ej. 'nit' o 'identificación').
+                 * @param {string[]} userHeaders - Array de cabeceras del usuario.
+                 * @returns {object} - Un objeto que mapea claves estándar a índices de columna.
+                 */
+                mapHeaders(userHeaders) {
+                    const map = {};
+                    // Diccionario de alias para cada campo estándar.
+                    const columnAliases = {
+                        taxid: ['identificación', 'federaltaxid', 'nit', 'ruc'],
+                        cardname: ['nombre', 'cardname', 'razonsocial'],
+                        cardtype: ['tipo de tercero', 'cardtype'],
+                        group: ['grupo', 'groupcode'],
+                        address: ['dirección', 'address'],
+                        city: ['ciudad', 'city'],
+                        country: ['país', 'country'],
+                        currency: ['moneda', 'currency'],
+                        account: ['cuenta', 'debitoraccount'],
+                        email: ['correo', 'emailaddress'],
+                        phone1: ['teléfono', 'phone1'],
+                        paymentterm: ['condición de pago', 'paytermsgrpcode'],
+                        doctype: ['tipo documento', 'tipo docuemnto', 'u_bpco_tdc'],
+                        persontype: ['tipo persona', 'u_bpco_tp'],
+                        regime: ['régimen', 'u_bpco_rtc'],
+                        nombre_solo: ['nombres', 'u_bpco_nombre', 'primer nombre'],
+                        apellido1: ['primer apellido', 'u_bpco_1apellido'],
+                        apellido2: ['segundo apellido', 'u_bpco_2apellido'],
+                        u_bpco_address: ['u_bpco_address'],
+                    };
+
+                    const invertedAliases = {};
+                    for (const key in columnAliases) {
+                        for (const alias of columnAliases[key]) {
+                            invertedAliases[alias] = key;
+                        }
+                    }
+                    // Itera sobre las cabeceras del usuario para construir el mapa.
+                    const mappedKeys = new Set();
+                    userHeaders.forEach((header, index) => {
+                        const key = invertedAliases[header];
+                        if (key && !mappedKeys.has(key)) {
+                            map[key] = index;
+                            mappedKeys.add(key);
+                        }
+                    });
+                    
+                    // Lógica especial (heurística) para manejar el caso donde hay dos columnas llamadas 'address'.
+                    // La primera se mapea a 'Address' y la segunda a 'U_BPCO_Address'.
+                    const addressIndexes = userHeaders.map((h, i) => h === 'address' ? i : -1).filter(i => i !== -1);
+                    if (addressIndexes.length > 1) {
+                        map['address'] = addressIndexes[0];
+                        map['u_bpco_address'] = addressIndexes[1];
+                    }
+
+                    return map;
+                }
+
+                /**
+                 * Procesa todas las líneas de datos según el modo seleccionado (build o audit).
+                 * @param {string} mode - El modo de operación: 'build' o 'audit'.
+                 * @returns {string|string[]} - El resultado del procesamiento.
+                 */
+                process(mode) {
+                    const results = [];
+                    if (mode === 'build') {
+                        // Añade las cabeceras y descripciones de SAP al inicio de la plantilla.
+                        results.push(this.sapHeaders.join('\t'));
+                        results.push(this.sapDescriptions.join('\t'));
+                    }
+                    
+                    const headerCount = this.userHeaders.length;
+
+                    this.lines.forEach((line, index) => {
+                        if (!line.trim()) return; // Ignora líneas vacías.
+                        
+                        // Rellena las filas con celdas vacías si no coinciden con el número de encabezados.
+                        // Esto evita errores con filas malformadas.
+                        const data = line.split('\t');
+                        while (data.length < headerCount) {
+                            data.push('');
+                        }
+
+                        const rowData = this.getRowData(data);
+                        const validator = new Validator(rowData, this.config, index + 2); // +2 para el número de línea real.
+                        const errors = validator.validateAll();
+                        if (mode === 'audit') {
+                            if (errors.length > 0) results.push(...errors);
+                        } else {
+                            const transformer = new Transformer(rowData, this.config, this.headerMap);
+                            const transformedRow = transformer.transform();
+                            results.push(this.sapHeaders.map(h => transformedRow[h] || '').join('\t'));
+                        }
+                    });
+                    return mode === 'build' ? results.join('\n') : results;
+                }
+                
+                /**
+                 * Convierte un array de datos de una fila en un objeto estructurado usando el mapa de cabeceras.
+                 * @param {string[]} data - Array de datos de una fila.
+                 * @returns {object} - Objeto con claves estándar y sus valores correspondientes.
+                 */
+                getRowData(data) {
+                    const row = {};
+                    for (const key in this.headerMap) {
+                        const index = this.headerMap[key];
+                        row[key] = data[index]?.trim() || '';
+                    }
+                    return row;
+                }
+            }
+            
+            /**
+             * Clase dedicada a las reglas de validación de datos.
+             */
+            class Validator {
+                constructor(rowData, config, lineNumber) { this.data = rowData; this.config = config; this.line = lineNumber; this.errors = []; }
+                addError(field, message) { this.errors.push(`Línea ${this.line} | Campo ${field}: ${message}`); }
+                validateAll() {
+                    const taxId = this.data.taxid?.split('-')[0] || '';
+                    // Ejemplos de reglas de validación:
+                    if (taxId && (taxId.length + 1) > 15) this.addError('CardCode', 'La identificación excede los 14 caracteres para el código.');
+                    if (this.data.cardname && this.data.cardname.length > 100) this.addError('CardName', 'El nombre excede los 100 caracteres.');
+                    if (this.data.address && this.data.address.length > 50) this.addError('Address (Col 5)', 'La dirección excede los 50 caracteres.');
+                    if (this.data.taxid && this.data.taxid.length > 32) this.addError('FederalTaxID', 'La identificación excede los 32 caracteres.');
+                    const country = (this.data.country || 'Colombia').toLowerCase() === 'colombia' ? 'CO' : this.data.country;
+                    if (country && !countryCodes.has(country.toUpperCase())) this.addError('Country', `El código de país '${country}' no es válido.`);
+                    const normalizedCity = (this.data.city || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    if (this.data.city && !municipalityMap.has(normalizedCity)) this.addError('U_BPCO_CS', `No se encontró código para la ciudad '${this.data.city}'.`);
+                    if (this.data.account && this.config.validAccounts.size > 0 && !this.config.validAccounts.has(this.data.account)) this.addError('DebitorAccount', `La cuenta '${this.data.account}' no está en la lista de permitidas.`);
+                    const paymentTermLower = this.data.paymentterm?.toLowerCase();
+                    if (paymentTermLower && !this.config.paymentTermsMap.has(paymentTermLower)) this.addError('PayTermsGrpCode', `La condición de pago '${this.data.paymentterm}' no tiene mapeo.`);
+                    return this.errors;
+                }
+            }
+
+            /**
+             * Clase responsable de transformar los datos de entrada al formato de salida de SAP.
+             */
+            class Transformer {
+                constructor(rowData, config, headerMap) { 
+                    this.data = rowData; 
+                    this.config = config; 
+                    this.headerMap = headerMap;
+                    this.finalRow = {}; 
+                }
+                
+                /**
+                 * Normaliza el texto a un formato específico (Nombres Propios, MAYÚSCULAS, minúsculas).
+                 * @param {string} text - El texto a normalizar.
+                 * @param {string|null} type - El tipo de normalización a aplicar.
+                 * @returns {string} - El texto normalizado.
+                 */
+                normalizeText(text, type = null) {
+                    if (!text) return '';
+                    const normalType = type || this.config.textNormalization || 'proper';
+                    
+                    if (normalType === 'upper') {
+                        return text.toUpperCase();
+                    } else if (normalType === 'lower') {
+                        return text.toLowerCase();
+                    } else { // 'proper' case
+                        return text.split(' ').map(word => {
+                            if (!word) return '';
+                            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+                        }).join(' ');
+                    }
+                }
+                
+                /**
+                 * Orquesta la secuencia de transformaciones para construir la fila final.
+                 */
+                transform() {
+                    this.setCardTypeAndGroup();
+                    this.setCardCode();
+                    this.setCardName();
+                    this.setAddresses();
+                    this.setIdentifiers();
+                    this.setFinancials();
+                    this.setContactInfo();
+                    this.setCustomFields();
+                    this.setDefaults();
+                    return this.finalRow;
+                }
+                // Asigna el tipo de tercero (cliente/proveedor) y el grupo correspondiente.
+                setCardTypeAndGroup() {
+                    const cardType = this.data.cardtype?.toLowerCase() || '';
+                    const country = (this.data.country || 'Colombia').toLowerCase() === 'colombia' ? 'CO' : this.data.country.toUpperCase();
+                    this.isEmployee = false;
+                    
+                    // Determina si es persona natural basándose en una columna explícita o en la presencia de campos de nombre/apellido.
+                    const hasSeparateNameFields = this.data.nombre_solo || this.data.apellido1;
+                    this.isNatural = (this.data.persontype?.toLowerCase() === 'natural') || (!!hasSeparateNameFields);
+
+                    if (cardType.includes('cliente') || cardType.includes('ccustomer')) { this.finalRow.CardType = 'cCustomer'; this.finalRow.GroupCode = country === 'CO' ? '100' : '102'; } 
+                    else if (cardType.includes('proveedor') || cardType.includes('csupplier')) { this.finalRow.CardType = 'cSupplier'; this.finalRow.GroupCode = country === 'CO' ? '101' : '103'; } 
+                    else if (cardType.includes('empleado')) { this.finalRow.CardType = 'cSupplier'; this.finalRow.GroupCode = '104'; this.isEmployee = true; this.isNatural = true; }
+                }
+                // Construye el código del socio de negocio (CardCode) con un prefijo y el NIT.
+                setCardCode() {
+                    let prefix = 'P';
+                    if (this.finalRow.CardType === 'cCustomer') prefix = 'C';
+                    if (this.isEmployee) prefix = 'E';
+                    const taxId = this.data.taxid?.split('-')[0] || '';
+                    this.finalRow.CardCode = (prefix + taxId).substring(0, 15);
+                }
+                // Asigna y normaliza el nombre del socio de negocio (CardName).
+                setCardName() { 
+                    this.finalRow.CardName = this.normalizeText((this.data.cardname || '').substring(0, 100)); 
+                }
+                // Procesa y asigna las direcciones y los códigos de ciudad/país.
+                setAddresses() {
+                    const address = this.data.address || '';
+                    const mmAddress = this.data.u_bpco_address || address; // Usa la segunda columna de dirección si existe, si no, la primera.
+
+                    const normalizedAddress = this.normalizeText(address);
+                    const normalizedMmAddress = this.normalizeText(mmAddress);
+
+                    this.finalRow.Address = normalizedAddress.substring(0, 50);
+                    this.finalRow.U_BPCO_Address = normalizedMmAddress;
+                    this.finalRow.City = this.normalizeText(this.data.city || '');
+                    this.finalRow.Country = (this.data.country || 'Colombia').toLowerCase() === 'colombia' ? 'CO' : this.data.country.toUpperCase();
+                    const normalizedCity = (this.data.city || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    this.finalRow.U_BPCO_CS = municipalityMap.get(normalizedCity) || '';
+                }
+                // Procesa los campos de identificación, incluyendo la separación de nombres y apellidos.
+                setIdentifiers() {
+                    this.finalRow.FederalTaxID = (this.data.taxid || '').substring(0, 32);
+
+                    const hasSeparateNameFields = this.headerMap.hasOwnProperty('nombre_solo') || this.headerMap.hasOwnProperty('apellido1');
+
+                    if (this.isNatural && hasSeparateNameFields) {
+                        // Si se proporcionan columnas separadas, se usan directamente.
+                        this.finalRow.U_BPCO_Nombre = this.normalizeText(this.data.nombre_solo || '');
+                        this.finalRow.U_BPCO_1Apellido = this.normalizeText(this.data.apellido1 || '');
+                        this.finalRow.U_BPCO_2Apellido = this.normalizeText(this.data.apellido2 || '');
+                    
+                    } else if (this.isNatural && this.data.cardname) {
+                        // Si no hay columnas separadas, intenta deducir los nombres/apellidos desde el nombre completo.
+                        const nameParts = this.data.cardname.split(' ').filter(Boolean);
+
+                        if (nameParts.length >= 4) {
+                            this.finalRow.U_BPCO_1Apellido = this.normalizeText(nameParts[0]);
+                            this.finalRow.U_BPCO_2Apellido = this.normalizeText(nameParts[1]);
+                            this.finalRow.U_BPCO_Nombre = this.normalizeText(nameParts.slice(2).join(' '));
+                        } else if (nameParts.length === 3) {
+                            this.finalRow.U_BPCO_Nombre = this.normalizeText(nameParts.slice(0, 2).join(' '));
+                            this.finalRow.U_BPCO_1Apellido = this.normalizeText(nameParts[2]);
+                            this.finalRow.U_BPCO_2Apellido = '';
+                        } else if (nameParts.length === 2) {
+                            this.finalRow.U_BPCO_Nombre = this.normalizeText(nameParts[0]);
+                            this.finalRow.U_BPCO_1Apellido = this.normalizeText(nameParts[1]);
+                            this.finalRow.U_BPCO_2Apellido = '';
+                        } else {
+                            this.finalRow.U_BPCO_Nombre = this.normalizeText(this.data.cardname || '');
+                            this.finalRow.U_BPCO_1Apellido = '';
+                            this.finalRow.U_BPCO_2Apellido = '';
+                        }
+                    } else {
+                        // Si no es persona natural, estos campos van vacíos.
+                        this.finalRow.U_BPCO_Nombre = '';
+                        this.finalRow.U_BPCO_1Apellido = '';
+                        this.finalRow.U_BPCO_2Apellido = '';
+                    }
+                }
+                // Asigna los campos financieros como moneda, cuenta asociada y condiciones de pago.
+                setFinancials() {
+                    this.finalRow.Currency = this.data.currency || '$';
+                    const account = this.data.account;
+                    // Usa la cuenta proporcionada si es válida; si no, usa una por defecto.
+                    if (this.config.validAccounts.size > 0 && this.config.validAccounts.has(account)) {
+                        this.finalRow.DebitorAccount = account;
+                    } else {
+                        if (this.finalRow.CardType === 'cCustomer') { this.finalRow.DebitorAccount = this.config.defaultAccountCustomer; } 
+                        else if (this.isEmployee) { this.finalRow.DebitorAccount = this.config.defaultAccountEmployee; } 
+                        else { this.finalRow.DebitorAccount = this.config.defaultAccountSupplier; }
+                    }
+                    // Asigna la condición de pago mapeada o la por defecto.
+                    const paymentTermLower = this.data.paymentterm?.toLowerCase();
+                    if (this.config.paymentTermsMap.has(paymentTermLower)) {
+                        this.finalRow.PayTermsGrpCode = this.config.paymentTermsMap.get(paymentTermLower);
+                    } else {
+                        this.finalRow.PayTermsGrpCode = this.config.defaultPaymentTerm;
+                    }
+                }
+                // Asigna la información de contacto.
+                setContactInfo() {
+                    this.finalRow.EmailAddress = this.data.email || '';
+                    this.finalRow.Phone1 = this.data.phone1 || '';
+                    this.finalRow.Cellular = ''; // Campo celular se deja vacío por defecto.
+                }
+                // Asigna valores a los campos de usuario (UDFs) de SAP.
+                setCustomFields() {
+                    const docTypeLower = this.data.doctype?.toLowerCase();
+                    if (this.config.docTypesMap.has(docTypeLower)) {
+                        this.finalRow.U_BPCO_TDC = this.config.docTypesMap.get(docTypeLower);
+                    }
+                    const personType = this.data.persontype?.toLowerCase();
+                    if (personType === 'natural' || this.isNatural) {
+                        this.finalRow.U_BPCO_TP = '01';
+                    } else if (personType === 'juridica' || !this.isNatural) {
+                        this.finalRow.U_BPCO_TP = '02';
+                    }
+                    
+                    const regime = this.data.regime?.toLowerCase();
+                    if (regime?.includes('simple')) this.finalRow.U_BPCO_RTC = 'RS';
+                    else if (regime?.includes('común') || regime?.includes('contribuyente')) this.finalRow.U_BPCO_RTC = 'RC';
+                }
+                // Establece valores por defecto para campos estándar de SAP.
+                setDefaults() {
+                    this.finalRow.VatLiable = 'Y';
+                    this.finalRow.SubjectToWithholdingTax = 'Y';
+                    this.finalRow.U_EsAutorret = '';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+```
